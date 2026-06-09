@@ -1,0 +1,66 @@
+name: Guard Test (checkout + git diff)
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check-sensitive-files:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      statuses: write
+    env:
+      SENSITIVE_FILES: ".claude/ AGENTS.md"
+    steps:
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch PR head
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git fetch origin "pull/${PR_NUMBER}/head:pr-head"
+          echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
+          echo "PR head SHA: $(git rev-parse pr-head)"
+
+      - name: Detect sensitive file changes
+        id: detect
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }}...pr-head)
+          echo "=== All changed files ==="
+          echo "$CHANGED"
+          echo ""
+
+          SENSITIVE_FOUND=false
+          MODIFIED=""
+          for pattern in $SENSITIVE_FILES; do
+            MATCHES=$(echo "$CHANGED" | grep -F "$pattern" || true)
+            if [ -n "$MATCHES" ]; then
+              SENSITIVE_FOUND=true
+              while IFS= read -r f; do
+                MODIFIED="${MODIFIED}- \`${f}\`"$'\n'
+              done <<< "$MATCHES"
+            fi
+          done
+
+          echo "sensitive=${SENSITIVE_FOUND}" >> $GITHUB_OUTPUT
+          echo ""
+          echo "=== Sensitive files detected: ${SENSITIVE_FOUND} ==="
+          if [ -n "$MODIFIED" ]; then
+            echo "$MODIFIED"
+          fi
+
+      - name: Post result comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          SENSITIVE: ${{ steps.detect.outputs.sensitive }}
+        run: |
+          if [ "$SENSITIVE" = "true" ]; then
+            gh pr comment "$PR_NUMBER" --body "**Guard Test**: Sensitive files detected — approval required."
+          else
+            gh pr comment "$PR_NUMBER" --body "**Guard Test**: No sensitive files changed — all clear."
+          fi
