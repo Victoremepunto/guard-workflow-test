@@ -67,7 +67,7 @@ jobs:
           REPO: ${{ github.repository }}
           MODIFIED: ${{ steps.result.outputs.modified_files }}
         run: |
-          gh pr comment "$PR_NUMBER" --body "**Guard Test**: Sensitive files detected — approval required."
+          gh pr comment "$PR_NUMBER" --repo "${REPO}" --body "**Guard Test**: Sensitive files detected — approval required."
           gh api "repos/${REPO}/statuses/${HEAD_SHA}" \
             -f state=failure \
             -f context="${STATUS_CONTEXT}" \
