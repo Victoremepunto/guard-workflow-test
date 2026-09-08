@@ -1,0 +1,4 @@
+{
+  "demo": true,
+  "note": "Evidence PR: touches a protected path (.claude/) so the guard posts a visibility comment."
+}
