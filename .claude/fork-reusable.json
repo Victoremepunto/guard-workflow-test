@@ -1,0 +1,4 @@
+{
+  "fork_demo": true,
+  "note": "Fork PR touching a protected path via the REUSABLE guard. This fork contains NO guard scripts."
+}
